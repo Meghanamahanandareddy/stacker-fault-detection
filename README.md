@@ -124,3 +124,5 @@ em++ -std=c++17 AnomalyDetector.cpp bindings.cpp --bind -s MODULARIZE=1 -s EXPOR
 
 [agv-motion-controller](https://github.com/VISHNU2305/agv-motion-controller) — the motion-control/navigation half of this two-project pair, covering C++ state machines, UML modeling, and obstacle rerouting.
 
+Authors:- Meghana Reddy , Pendyala Vishnu sai
+
