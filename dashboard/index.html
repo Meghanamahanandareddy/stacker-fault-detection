@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Machine Health Monitor</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0; background: radial-gradient(ellipse at top, #0d1420 0%, #05070a 60%);
+    color: #e6f0ff; font-family: 'Segoe UI', Arial, sans-serif; min-height: 100vh;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 28px 24px 60px; }
+
+  .header { text-align: center; margin-bottom: 8px; }
+  .header h1 { font-size: 26px; margin: 0; letter-spacing: 0.3px; }
+  .header .sub { color: #7c8ba0; font-size: 14px; margin-top: 6px; }
+
+  .status-hero {
+    display: flex; align-items: center; justify-content: center; gap: 20px;
+    margin: 28px 0; padding: 22px; border-radius: 18px;
+    background: linear-gradient(160deg, rgba(14,20,28,0.9), rgba(10,14,20,0.9));
+    border: 1px solid rgba(127,208,255,0.15);
+    transition: box-shadow 0.3s ease;
+  }
+  .status-hero.fault { box-shadow: 0 0 40px rgba(255,60,60,0.25); border-color: rgba(255,80,80,0.35); }
+  .light { width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; }
+  .light.ok { background: #33dd66; box-shadow: 0 0 20px #33dd66; }
+  .light.bad { background: #ff3333; box-shadow: 0 0 20px #ff3333; animation: blink 0.8s infinite; }
+  @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+  .status-text-main { font-size: 22px; font-weight: 700; }
+  .status-text-sub { font-size: 13.5px; color: #9fb3c8; margin-top: 2px; }
+
+  .machine-stage { display: flex; justify-content: center; margin: 10px 0 30px; }
+  .machine-box { width: 220px; height: 220px; position: relative; }
+  @keyframes shake {
+    0%, 100% { transform: translate(0,0) rotate(0deg); }
+    20% { transform: translate(-4px,2px) rotate(-1.5deg); }
+    40% { transform: translate(4px,-2px) rotate(1.5deg); }
+    60% { transform: translate(-3px,-3px) rotate(-1deg); }
+    80% { transform: translate(3px,3px) rotate(1deg); }
+  }
+  .shaking { animation: shake 0.15s infinite; }
+  .spark { position: absolute; font-size: 22px; opacity: 0; pointer-events: none; }
+  @keyframes sparkPop {
+    0% { opacity: 1; transform: translateY(0) scale(0.8); }
+    100% { opacity: 0; transform: translateY(-30px) scale(1.3); }
+  }
+
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .card {
+    background: linear-gradient(160deg, rgba(14,20,28,0.9), rgba(10,14,20,0.9));
+    border: 1px solid rgba(127,208,255,0.18); border-radius: 16px; padding: 20px;
+    text-align: center;
+  }
+  .card .icon { font-size: 30px; }
+  .card h3 { font-size: 15px; color: #e6f0ff; font-weight: 700; margin: 8px 0 2px; letter-spacing: 0.3px; }
+  .card .plain { font-size: 12px; color: #5a6b80; margin-bottom: 12px; min-height: 28px; }
+
+  .dial-wrap { position: relative; width: 130px; height: 130px; margin: 0 auto; }
+  .dial-label { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .dial-value { font-size: 22px; font-weight: 700; }
+  .dial-unit { font-size: 11px; color: #7c8ba0; }
+  .dial-word { font-size: 12px; font-weight: 700; margin-top: 2px; letter-spacing: 0.3px; }
+
+  input[type=range] { width: 100%; margin-top: 16px; accent-color: #7fd0ff; }
+  .slider-label { font-size: 11px; color: #5a6b80; display: flex; justify-content: space-between; margin-top: 4px; }
+
+  .controls-row { display: flex; gap: 12px; margin-top: 26px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    padding: 12px 22px; border-radius: 10px; border: 1px solid rgba(127,208,255,0.3);
+    background: linear-gradient(160deg, rgba(20,28,38,0.92), rgba(12,18,26,0.92));
+    color: #e6f0ff; font-size: 13.5px; font-weight: 600; cursor: pointer;
+  }
+  .btn:hover { border-color: #7fd0ff; box-shadow: 0 0 14px rgba(127,208,255,0.25); }
+  .btn.danger { border-color: rgba(255,120,120,0.35); }
+  .btn.danger:hover { border-color: #ff7878; }
+
+  .log-section { margin-top: 30px; }
+  .log-section h2 { font-size: 14px; color: #9fb3c8; text-transform: uppercase; letter-spacing: 0.5px; }
+  .log-panel {
+    background: linear-gradient(160deg, rgba(14,20,28,0.9), rgba(10,14,20,0.9));
+    border: 1px solid rgba(127,208,255,0.18); border-radius: 14px; padding: 16px;
+    max-height: 230px; overflow-y: auto;
+  }
+  .log-entry {
+    padding: 10px 14px; border-radius: 8px; margin-bottom: 6px; font-size: 13px;
+    display: flex; justify-content: space-between; align-items: center;
+    background: rgba(255,60,60,0.08); border-left: 3px solid #ff4444; color: #ffc2c2;
+  }
+  .log-entry .fault-tag { font-weight: 700; color: #ff8888; margin-right: 8px; }
+  .log-entry .time { color: #8a6a6a; font-size: 11.5px; }
+  .placeholder { color: #5a6b80; font-size: 13px; text-align: center; padding: 10px; }
+
+  .footer-note { text-align: center; color: #3a4a5e; font-size: 11px; margin-top: 30px; letter-spacing: 0.4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header">
+    <h1>🏭 Machine Health Monitor</h1>
+    <div class="sub">Watching the crane's motor 24/7 so problems get caught before they cause a breakdown</div>
+  </div>
+
+  <div class="status-hero" id="status-hero">
+    <div class="light ok" id="status-light"></div>
+    <div>
+      <div class="status-text-main" id="status-main">Everything looks good</div>
+      <div class="status-text-sub" id="status-sub">The machine is running normally</div>
+    </div>
+  </div>
+
+  <div class="machine-stage">
+    <div class="machine-box" id="machine-box">
+      <svg viewBox="0 0 200 200" width="220" height="220">
+        <rect x="40" y="150" width="120" height="20" rx="4" fill="#2a3a4a"/>
+        <rect x="55" y="80" width="90" height="75" rx="10" id="motor-body" fill="#3a5a7a"/>
+        <rect x="65" y="95" width="70" height="6" rx="3" fill="#22303f"/>
+        <rect x="65" y="108" width="70" height="6" rx="3" fill="#22303f"/>
+        <rect x="65" y="121" width="70" height="6" rx="3" fill="#22303f"/>
+        <circle cx="150" cy="117" r="18" fill="#556677" id="gear-center"/>
+        <circle cx="150" cy="117" r="7" fill="#2a3a4a"/>
+        <circle cx="100" cy="70" r="9" id="motor-beacon" fill="#33dd66"/>
+      </svg>
+      <div class="spark" id="spark1" style="top:30px; left:150px;">⚡</div>
+      <div class="spark" id="spark2" style="top:60px; left:170px;">⚡</div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="icon">📳</div>
+      <h3>Vibration</h3>
+      <div class="plain">How much the machine is shaking</div>
+      <div class="dial-wrap">
+        <svg width="130" height="130" viewBox="0 0 130 130">
+          <circle cx="65" cy="65" r="54" fill="none" stroke="#1c2733" stroke-width="12"/>
+          <circle cx="65" cy="65" r="54" fill="none" stroke="#2266cc" stroke-width="12"
+                  stroke-dasharray="339" stroke-dashoffset="339" stroke-linecap="round"
+                  transform="rotate(-90 65 65)" id="vib-ring"/>
+        </svg>
+        <div class="dial-label">
+          <div class="dial-value" id="vib-value">0.8</div>
+          <div class="dial-unit">g-force</div>
+          <div class="dial-word" id="vib-word" style="color:#33dd66;">NORMAL</div>
+        </div>
+      </div>
+      <input type="range" id="vib-slider" min="0" max="500" value="80">
+      <div class="slider-label"><span>Still</span><span>Shaking hard</span></div>
+    </div>
+
+    <div class="card">
+      <div class="icon">🔌</div>
+      <h3>Current</h3>
+      <div class="plain">How hard the motor is drawing power</div>
+      <div class="dial-wrap">
+        <svg width="130" height="130" viewBox="0 0 130 130">
+          <circle cx="65" cy="65" r="54" fill="none" stroke="#1c2733" stroke-width="12"/>
+          <circle cx="65" cy="65" r="54" fill="none" stroke="#cc6622" stroke-width="12"
+                  stroke-dasharray="339" stroke-dashoffset="339" stroke-linecap="round"
+                  transform="rotate(-90 65 65)" id="cur-ring"/>
+        </svg>
+        <div class="dial-label">
+          <div class="dial-value" id="cur-value">4.0</div>
+          <div class="dial-unit">amps</div>
+          <div class="dial-word" id="cur-word" style="color:#33dd66;">NORMAL</div>
+        </div>
+      </div>
+      <input type="range" id="cur-slider" min="0" max="1500" value="400">
+      <div class="slider-label"><span>Idle</span><span>Overloaded</span></div>
+    </div>
+
+    <div class="card">
+      <div class="icon">🌡️</div>
+      <h3>Temperature</h3>
+      <div class="plain">How hot the motor is running</div>
+      <div class="dial-wrap">
+        <svg width="130" height="130" viewBox="0 0 130 130">
+          <circle cx="65" cy="65" r="54" fill="none" stroke="#1c2733" stroke-width="12"/>
+          <circle cx="65" cy="65" r="54" fill="none" stroke="#22aa66" stroke-width="12"
+                  stroke-dasharray="339" stroke-dashoffset="339" stroke-linecap="round"
+                  transform="rotate(-90 65 65)" id="temp-ring"/>
+        </svg>
+        <div class="dial-label">
+          <div class="dial-value" id="temp-value">50</div>
+          <div class="dial-unit">°C</div>
+          <div class="dial-word" id="temp-word" style="color:#33dd66;">NORMAL</div>
+        </div>
+      </div>
+      <input type="range" id="temp-slider" min="0" max="10000" value="5000">
+      <div class="slider-label"><span>Cool</span><span>Overheating</span></div>
+    </div>
+  </div>
+
+  <div class="controls-row">
+    <button class="btn" id="btn-normal">✅ Reset to Normal</button>
+    <button class="btn danger" id="btn-inject-vib">📳 Inject Vibration Fault</button>
+    <button class="btn danger" id="btn-inject-cur">🔌 Inject Current Spike</button>
+    <button class="btn danger" id="btn-inject-temp">🌡️ Inject Temperature Fault</button>
+  </div>
+
+  <div class="log-section">
+    <h2>Fault Log</h2>
+    <div class="log-panel" id="log-panel">
+      <div class="placeholder">No faults yet — adjust sliders or use the inject buttons above.</div>
+    </div>
+  </div>
+
+  <div class="footer-note">Powered by real compiled C++ fault-detection logic, running instantly in your browser</div>
+</div>
+
+<script src="anomaly.js"></script>
+<script>
+let detector = null;
+let simTimeS = 0;
+
+createAnomalyModule().then((Module) => {
+  detector = new Module.AnomalyDetector();
+  console.log("Compiled C++ AnomalyDetector loaded via WebAssembly.");
+  requestAnimationFrame(loop);
+});
+
+const vibSlider = document.getElementById('vib-slider');
+const curSlider = document.getElementById('cur-slider');
+const tempSlider = document.getElementById('temp-slider');
+
+function currentVibration() { return vibSlider.value / 100; }
+function currentCurrent() { return curSlider.value / 100; }
+function currentTemperature() { return tempSlider.value / 100; }
+
+document.getElementById('btn-normal').addEventListener('click', () => {
+  vibSlider.value = 80; curSlider.value = 400; tempSlider.value = 5000;
+});
+document.getElementById('btn-inject-vib').addEventListener('click', () => { vibSlider.value = 320; });
+document.getElementById('btn-inject-cur').addEventListener('click', () => { curSlider.value = 950; });
+document.getElementById('btn-inject-temp').addEventListener('click', () => { tempSlider.value = 8200; });
+
+const RING_CIRCUMFERENCE = 339;
+function setRing(el, value, max, danger) {
+  const pct = Math.min(value / max, 1);
+  el.style.strokeDashoffset = RING_CIRCUMFERENCE * (1 - pct);
+  el.style.stroke = danger ? '#ff4444' : el.dataset.baseColor;
+}
+document.getElementById('vib-ring').dataset.baseColor = '#2266cc';
+document.getElementById('cur-ring').dataset.baseColor = '#cc6622';
+document.getElementById('temp-ring').dataset.baseColor = '#22aa66';
+
+function setWord(el, danger) {
+  el.innerText = danger ? 'FAULT' : 'NORMAL';
+  el.style.color = danger ? '#ff5555' : '#33dd66';
+}
+
+function addLogEntry(faultKind, value, timestampS) {
+  const panel = document.getElementById('log-panel');
+  const placeholder = panel.querySelector('.placeholder');
+  if (placeholder) placeholder.remove();
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.innerHTML = `<span><span class="fault-tag">${faultKind}</span>value = ${value.toFixed(2)}</span><span class="time">t = ${timestampS.toFixed(2)}s</span>`;
+  panel.insertBefore(entry, panel.firstChild);
+  while (panel.children.length > 20) panel.removeChild(panel.lastChild);
+}
+
+function popSpark(el) {
+  el.style.animation = 'none';
+  void el.offsetWidth;
+  el.style.animation = 'sparkPop 0.5s ease-out';
+}
+
+let lastFrameTime = performance.now();
+let sparkTimer = 0;
+let lastLoggedFaultCount = 0;
+
+function loop(now) {
+  const dt = (now - lastFrameTime) / 1000;
+  lastFrameTime = now;
+  simTimeS += dt;
+
+  const vib = currentVibration();
+  const cur = currentCurrent();
+  const temp = currentTemperature();
+
+  const vibDanger = vib > 2.5;
+  const curDanger = cur > 8.0;
+  const tempDanger = temp > 75.0;
+  const anyDanger = vibDanger || curDanger || tempDanger;
+
+  document.getElementById('vib-value').innerText = vib.toFixed(1);
+  document.getElementById('cur-value').innerText = cur.toFixed(1);
+  document.getElementById('temp-value').innerText = Math.round(temp);
+
+  setRing(document.getElementById('vib-ring'), vib, 5.0, vibDanger);
+  setRing(document.getElementById('cur-ring'), cur, 15.0, curDanger);
+  setRing(document.getElementById('temp-ring'), temp, 100.0, tempDanger);
+
+  setWord(document.getElementById('vib-word'), vibDanger);
+  setWord(document.getElementById('cur-word'), curDanger);
+  setWord(document.getElementById('temp-word'), tempDanger);
+
+  const machineBox = document.getElementById('machine-box');
+  machineBox.classList.toggle('shaking', vibDanger);
+  document.getElementById('motor-body').setAttribute('fill', tempDanger ? '#aa3322' : '#3a5a7a');
+  document.getElementById('motor-beacon').setAttribute('fill', anyDanger ? '#ff3333' : '#33dd66');
+
+  if (curDanger) {
+    sparkTimer -= dt;
+    if (sparkTimer <= 0) {
+      popSpark(document.getElementById('spark1'));
+      popSpark(document.getElementById('spark2'));
+      sparkTimer = 0.4;
+    }
+  }
+
+  const hero = document.getElementById('status-hero');
+  const light = document.getElementById('status-light');
+  const main = document.getElementById('status-main');
+  const sub = document.getElementById('status-sub');
+
+    if (detector) {
+    const faultCount = detector.evaluate(simTimeS, vib, cur, temp); // <-- real compiled C++ decision
+
+    if (faultCount > 0) {
+      hero.classList.add('fault');
+      light.className = 'light bad';
+
+      const allKinds = detector.getAllFaultKindsThisTick();
+      const kindsList = [];
+      for (let i = 0; i < allKinds.size(); i++) kindsList.push(allKinds.get(i));
+
+      main.innerText = kindsList.length > 1
+        ? "Multiple Faults Detected: " + kindsList.join(" + ")
+        : "Fault Detected: " + kindsList[0];
+
+      const sentenceFor = (kind) => {
+        if (kind === 'VIBRATION_HIGH') return "Vibration is above the safe threshold — check for loose parts or imbalance";
+        if (kind === 'CURRENT_SPIKE') return "Current draw is above the safe threshold — possible overload or jam";
+        if (kind === 'TEMPERATURE_HIGH') return "Temperature is above the safe threshold — check cooling and load";
+        return "The machine needs attention";
+      };
+      sub.innerText = kindsList.length > 1
+        ? kindsList.map(sentenceFor).join("  |  ")
+        : sentenceFor(kindsList[0]);
+
+      const totalCount = detector.getFaultCount();
+      if (totalCount !== lastLoggedFaultCount) {
+        // one log line per fault kind that fired this tick, with its
+        // actual value pulled directly from the live reading (not the
+        // C++ log, so each simultaneous fault shows its correct number)
+        const valueFor = (kind) => {
+          if (kind === 'VIBRATION_HIGH') return vib;
+          if (kind === 'CURRENT_SPIKE') return cur;
+          if (kind === 'TEMPERATURE_HIGH') return temp;
+          return 0;
+        };
+        kindsList.forEach(k => addLogEntry(k, valueFor(k), simTimeS));
+        lastLoggedFaultCount = totalCount;
+      }
+    } else {
+      hero.classList.remove('fault');
+      light.className = 'light ok';
+      main.innerText = "Everything looks good";
+      sub.innerText = "The machine is running normally";
+    }
+  }
+  requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

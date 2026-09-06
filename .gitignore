@@ -1,0 +1,5 @@
+firmware/FreeRTOS-Kernel/
+firmware/rtos_sim
+data/telemetry_log.csv
+venv/
+ml/telemetry_plot.png
